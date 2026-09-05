@@ -31,20 +31,40 @@ const envSchema = z.object({
   STORAGE_SECRET_ACCESS_KEY: optional(z.string().min(1)),
 });
 
+/** First non-empty value wins. */
+function pick(...names: string[]): string | undefined {
+  for (const name of names) {
+    const value = process.env[name];
+    if (value && value.trim() !== "") {
+      return value;
+    }
+  }
+  return undefined;
+}
+
 /**
- * Railway injects a connected Bucket's credentials under bare names
- * (`ENDPOINT`, `BUCKET`, …). Accepting those as a fallback means the deployed
- * service works whether the variables are wired through as `STORAGE_*` or left
- * with Railway's defaults — one less thing to get wrong at deploy time.
+ * Bucket credentials arrive under different names depending on how the bucket
+ * was wired up in Railway: bare names (`ENDPOINT`, `BUCKET`, …) when referenced
+ * manually, or `AWS_*` when using Railway's AWS SDK preset. Accepting all three
+ * spellings means the deployed service works regardless of which path was
+ * taken — one less thing to get wrong at deploy time.
  */
 const rawEnv = {
   ...process.env,
-  STORAGE_ENDPOINT: process.env["STORAGE_ENDPOINT"] || process.env["ENDPOINT"],
-  STORAGE_REGION: process.env["STORAGE_REGION"] || process.env["REGION"],
-  STORAGE_BUCKET: process.env["STORAGE_BUCKET"] || process.env["BUCKET"],
-  STORAGE_ACCESS_KEY_ID: process.env["STORAGE_ACCESS_KEY_ID"] || process.env["ACCESS_KEY_ID"],
-  STORAGE_SECRET_ACCESS_KEY:
-    process.env["STORAGE_SECRET_ACCESS_KEY"] || process.env["SECRET_ACCESS_KEY"],
+  STORAGE_ENDPOINT: pick(
+    "STORAGE_ENDPOINT",
+    "ENDPOINT",
+    "AWS_ENDPOINT_URL_S3",
+    "AWS_ENDPOINT_URL",
+  ),
+  STORAGE_REGION: pick("STORAGE_REGION", "REGION", "AWS_REGION", "AWS_DEFAULT_REGION"),
+  STORAGE_BUCKET: pick("STORAGE_BUCKET", "BUCKET", "AWS_BUCKET", "S3_BUCKET"),
+  STORAGE_ACCESS_KEY_ID: pick("STORAGE_ACCESS_KEY_ID", "ACCESS_KEY_ID", "AWS_ACCESS_KEY_ID"),
+  STORAGE_SECRET_ACCESS_KEY: pick(
+    "STORAGE_SECRET_ACCESS_KEY",
+    "SECRET_ACCESS_KEY",
+    "AWS_SECRET_ACCESS_KEY",
+  ),
 };
 
 const parsed = envSchema.safeParse(rawEnv);
