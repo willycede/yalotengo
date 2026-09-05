@@ -73,6 +73,77 @@ Todas las rutas salvo `/auth/register` y `/auth/login` requieren
 Crear y editar productos aceptan `application/json` o `multipart/form-data`
 (con la imagen en el campo `photo`).
 
+## Despliegue en Railway
+
+El repo tiene dos apps, así que son **dos servicios** apuntando al mismo
+repositorio, cada uno con su *Root Directory*.
+
+### Recursos a crear en el proyecto
+
+| Recurso | Para qué |
+| --- | --- |
+| PostgreSQL | Base de datos (expone `DATABASE_URL`) |
+| Bucket | Fotos de productos |
+| Servicio `backend` | Root Directory: `backend` |
+| Servicio `web` | Root Directory: `web` |
+
+### Servicio backend
+
+| Ajuste | Valor |
+| --- | --- |
+| Build Command | `npm run build` |
+| Start Command | `npm run start:prod` |
+
+`start:prod` corre las migraciones y luego arranca el servidor. Usa
+`knexfile.cjs`, que apunta a las migraciones ya compiladas en `dist/` —
+`knexfile.ts` necesitaría `ts-node`, que es devDependency y se poda en
+producción.
+
+Variables:
+
+```
+DATABASE_URL   = ${{Postgres.DATABASE_URL}}
+JWT_SECRET     = <genera uno nuevo, ver abajo>
+CORS_ORIGIN    = https://<tu-servicio-web>.up.railway.app
+NODE_ENV       = production
+```
+
+Conecta el Bucket al servicio. El backend acepta tanto los nombres que Railway
+inyecta (`ENDPOINT`, `REGION`, `BUCKET`, `ACCESS_KEY_ID`, `SECRET_ACCESS_KEY`)
+como los prefijados con `STORAGE_`, así que no hace falta renombrar nada.
+
+Genera el secreto JWT — **nunca dejes el del `.env.example`**:
+
+```bash
+node -e "console.log(require('crypto').randomBytes(48).toString('base64url'))"
+```
+
+### Servicio web
+
+| Ajuste | Valor |
+| --- | --- |
+| Build Command | `npm run build` |
+| Start Command | `npm start` |
+
+```
+VITE_API_URL = https://<tu-servicio-backend>.up.railway.app
+```
+
+⚠️ Vite **incrusta las variables `VITE_*` en el bundle durante el build**, no
+las lee en tiempo de ejecución. Si cambias `VITE_API_URL` tienes que
+redesplegar; cambiarla sin rebuild no surte efecto.
+
+`npm start` sirve `dist/` con `serve -s`, donde el `-s` reescribe las rutas
+desconocidas a `index.html`. Sin eso, recargar en `/productos` daría 404 porque
+el enrutado es del lado del cliente.
+
+### Orden sugerido
+
+1. Crea PostgreSQL y el Bucket.
+2. Despliega el backend y copia su URL pública.
+3. Despliega la web con `VITE_API_URL` apuntando a esa URL.
+4. Vuelve al backend y pon `CORS_ORIGIN` con la URL de la web.
+
 ## Decisiones técnicas
 
 - **Arquitectura por capas** en el backend: rutas → controladores → servicios →
