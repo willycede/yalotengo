@@ -1,0 +1,30 @@
+# Dependencias
+node_modules/
+
+# Variables de entorno — NUNCA subir: contienen credenciales reales
+.env
+.env.*
+!.env.example
+
+# Builds
+dist/
+build/
+web-build/
+
+# App movil React Native, descartada a favor de la web.
+# Se conserva en disco pero queda fuera del repositorio.
+mobile/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-error.log*
+
+# TypeScript
+*.tsbuildinfo
+
+# Editor y sistema operativo
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
